@@ -1,6 +1,9 @@
 import logging
 from typing import List, Dict, Any, Optional
 from app.db.neo4j import neo4j_conn
+from app.memory import record_research_turn
+from app.memory import get_research_memory
+from app.llm import synthesize_paper_summary, generate_research_chat_response
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +137,114 @@ def get_conflicting_evidence_report(disease_id: str = "DIS:IPF") -> List[Dict[st
         """
         results = session.run(query, disease_id=disease_id).data()
         return results
+
+
+def investigate_with_graph(question: str, drug_name: Optional[str] = None, session_id: Optional[str] = None) -> Dict[str, Any]:
+    """A transparent retrieval-and-reasoning layer over the Neo4j evidence graph.
+    Uses Groq LLM grounded strictly in Neo4j facts.
+    """
+    normalized = (drug_name or question or "").strip()
+    matched_drug = None
+    candidates = get_candidate_drugs_with_evidence()
+    for candidate in candidates:
+        if candidate["drug_name"].lower() in normalized.lower() or normalized.lower() in candidate["drug_name"].lower():
+            matched_drug = candidate["drug_name"]
+            break
+
+    paths = find_evidence_paths(drug_name=matched_drug) if matched_drug else find_evidence_paths()[:6]
+    papers = get_ingested_papers(drug_name=matched_drug) if matched_drug else get_ingested_papers()[:6]
+    
+    memory_messages = []
+    if session_id:
+        try:
+            mem = get_research_memory(session_id)
+            memory_messages = mem.get("messages", [])
+        except Exception:
+            pass
+
+    llm_resp = generate_research_chat_response(
+        question=question,
+        matched_drug=matched_drug,
+        paths=paths,
+        papers=papers,
+        candidates=candidates,
+        memory_messages=memory_messages,
+    )
+
+    if matched_drug:
+        candidate = next((item for item in candidates if item["drug_name"] == matched_drug), candidates[0])
+        evidence = candidate.get("evidence_list", [])
+        supporting = [item for item in evidence if item["direction"] == "supports"]
+        negative = [item for item in evidence if item["direction"] in {"no_effect", "adverse"}]
+        source_ids = sorted({path["study_nct_id"] for path in paths if path.get("study_nct_id")})
+        pmids = sorted({path["paper_pmid"] for path in paths if path.get("paper_pmid")})
+
+        risk = "warning" if negative else ("supported" if supporting else "insufficient")
+        result = {
+            "question": question,
+            "matched_entity": matched_drug,
+            "answer": llm_resp["text"],
+            "classification": risk,
+            "retrieval": {
+                "multi_hop_paths": len(paths),
+                "supporting_records": len(supporting),
+                "negative_records": len(negative),
+                "clinical_trials": source_ids,
+                "pubmed_ids": pmids,
+            },
+            "caveat": "This is graph-grounded research support, not medical advice or a treatment recommendation.",
+        }
+        if session_id:
+            paper_ids = [f"RP:PMID{pmid}" for pmid in pmids]
+            record_research_turn(session_id, question, llm_resp["text"], [candidate.get("drug_id", "")], paper_ids)
+            result["memory_session_id"] = session_id
+        return result
+
+    # When no specific drug is named (e.g. general question, mechanism question, or typo/unknown)
+    search_results = search_biomedical_entities(normalized)
+    entity_names = [item["name"] for item in search_results[:5]]
+    result = {
+        "question": question,
+        "matched_entity": None,
+        "answer": llm_resp["text"],
+        "classification": "supported" if entity_names else "insufficient",
+        "retrieval": {"matched_entities": entity_names, "multi_hop_paths": len(paths)},
+        "caveat": "The system synthesizes graph-grounded knowledge from Neo4j Aura.",
+    }
+    if session_id:
+        record_research_turn(session_id, question, result["answer"], [], [])
+        result["memory_session_id"] = session_id
+    return result
+
+
+def summarize_research_papers(question: str, drug_name: str, session_id: str) -> Dict[str, Any]:
+    """Summarize only the papers connected to a requested medicine, with provenance."""
+    with neo4j_conn.get_session() as session:
+        papers = session.run("""
+            MATCH (dr:Drug)
+            WHERE toLower(dr.name) = toLower($drug_name)
+            MATCH (dr)-[:HAS_EVIDENCE]->(ev:Evidence)<-[:SUPPORTS_OR_REPORTS]-(p:ResearchPaper)
+            RETURN dr.id AS drug_id, p.id AS paper_id, p.pmid AS pmid, p.title AS title,
+                   p.journal AS journal, p.pub_date AS pub_date, p.abstract AS abstract,
+                   ev.tier AS tier, ev.direction AS direction, ev.summary AS evidence_summary
+            ORDER BY ev.tier ASC, p.pub_date DESC
+        """, drug_name=drug_name).data()
+    if not papers:
+        return {"answer": "No connected research papers were found for that medicine in the curated graph.", "papers": [], "session_id": session_id}
+
+    positive = [p for p in papers if p["direction"] == "supports"]
+    negative = [p for p in papers if p["direction"] != "supports"]
+    statements = [f"{p['title']} ({p['journal']}, PMID {p['pmid']}) reports: {p['evidence_summary']}" for p in papers]
+    extractive_synthesis = (
+        f"Graph-grounded paper synthesis for {drug_name}: {len(papers)} linked paper(s) were retrieved. "
+        f"{len(positive)} support record(s) and {len(negative)} negative/no-effect record(s) are preserved. "
+        + " ".join(statements)
+    )
+    memory = get_research_memory(session_id)
+    synthesis = synthesize_paper_summary(question, papers, memory["messages"])
+    answer = synthesis["text"] if synthesis["mode"] == "groq_grounded" else extractive_synthesis
+    record_research_turn(session_id, question, answer, [papers[0]["drug_id"]], [p["paper_id"] for p in papers])
+    return {"answer": answer, "papers": papers, "session_id": session_id, "supporting_records": len(positive), "negative_records": len(negative), "synthesis_mode": synthesis["mode"]}
 
 def search_biomedical_entities(search_term: str) -> List[Dict[str, Any]]:
     """Search for entities matching the query term across fulltext indexes and standard names."""

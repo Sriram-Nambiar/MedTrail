@@ -20,10 +20,10 @@ export const BenchmarkModal: React.FC<BenchmarkModalProps> = ({ data, onClose })
               Evaluation Baseline
             </span>
             <h2 className="text-lg font-bold text-slate-900 mt-1">
-              Knowledge Graph vs. Keyword Search Comparison
+              Grounded Graph Retrieval vs. Ungrounded Baseline
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Demonstrating why multi-hop graph retrieval is essential over naive keyword matching.
+              This is a controlled provenance benchmark, not a claim of universal superiority over any named model.
             </p>
           </div>
           <button
@@ -45,7 +45,7 @@ export const BenchmarkModal: React.FC<BenchmarkModalProps> = ({ data, onClose })
             {/* Keyword Search side */}
             <div className="p-3.5 bg-rose-50/50 border border-rose-200 rounded-xl space-y-2">
               <div className="font-semibold text-rose-800 flex items-center gap-1.5">
-                <Search size={14} /> Plain PubMed Keyword Search
+                <Search size={14} /> Ungrounded / Keyword Baseline
               </div>
               <div className="font-mono text-[11px] bg-white/80 p-1.5 rounded border border-rose-100 text-slate-700">
                 {data.scenario_1.keyword_search.query}
@@ -84,7 +84,7 @@ export const BenchmarkModal: React.FC<BenchmarkModalProps> = ({ data, onClose })
             {/* Keyword Search side */}
             <div className="p-3.5 bg-rose-50/50 border border-rose-200 rounded-xl space-y-2">
               <div className="font-semibold text-rose-800 flex items-center gap-1.5">
-                <Search size={14} /> Keyword / Chatbot Search
+                <Search size={14} /> Ungrounded Baseline
               </div>
               <p className="text-rose-900 leading-relaxed">
                 {data.scenario_2.keyword_search.limitation}
@@ -116,6 +116,7 @@ export const BenchmarkModal: React.FC<BenchmarkModalProps> = ({ data, onClose })
 
         {/* Footer */}
         <div className="pt-2 border-t border-slate-100 flex justify-end">
+          <p className="mr-auto text-[11px] text-slate-500 max-w-lg">MedTrail is evaluated on whether it returns the graph-linked papers, evidence tiers, contradictions, and source IDs for this fixed IPF benchmark. Do not present this as a live head-to-head test against ChatGPT.</p>
           <button
             onClick={onClose}
             className="px-4 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition"

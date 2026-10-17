@@ -3,6 +3,8 @@ import { Bot, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle } from 'lucide
 
 interface AgentThinkingProps {
   activeDrug: string;
+  liveAnswer?: string;
+  classification?: 'supported' | 'warning' | 'insufficient';
 }
 
 interface ThoughtStep {
@@ -134,7 +136,7 @@ const THOUGHT_SCENARIOS: Record<string, { title: string; steps: ThoughtStep[] }>
   },
 };
 
-export const AgentThinking: React.FC<AgentThinkingProps> = ({ activeDrug }) => {
+export const AgentThinking: React.FC<AgentThinkingProps> = ({ activeDrug, liveAnswer, classification }) => {
   const [expanded, setExpanded] = useState(false);
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
 
@@ -153,6 +155,7 @@ export const AgentThinking: React.FC<AgentThinkingProps> = ({ activeDrug }) => {
   }, [activeDrug, scenario.steps.length]);
 
   const activeStep = scenario.steps[currentStepIdx] || scenario.steps[scenario.steps.length - 1];
+  const isWarning = classification === 'warning' || activeStep.status === 'warning';
 
   return (
     <div className="bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-xl shadow-xs overflow-hidden transition-all text-xs">
@@ -167,7 +170,7 @@ export const AgentThinking: React.FC<AgentThinkingProps> = ({ activeDrug }) => {
               Agent Thought Stream:
             </span>
             <span className="text-slate-600 truncate font-medium">
-              {activeStep.step} — {activeStep.detail}
+              {liveAnswer || `${activeStep.step} — ${activeStep.detail}`}
             </span>
           </div>
         </div>
@@ -189,11 +192,16 @@ export const AgentThinking: React.FC<AgentThinkingProps> = ({ activeDrug }) => {
       </div>
 
       {/* Expanded Step-by-Step Reasoning Trail */}
-      {expanded && (
+          {expanded && (
         <div className="p-4 border-t border-slate-100 space-y-2.5 bg-slate-50/60 animate-in fade-in duration-150">
           <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
             Reasoning Chain: {scenario.title}
           </div>
+          {liveAnswer && (
+            <div className={`p-2.5 rounded-lg border leading-relaxed ${isWarning ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`}>
+              <span className="font-semibold">Live graph-grounded synthesis: </span>{liveAnswer}
+            </div>
+          )}
           <div className="space-y-2">
             {scenario.steps.map((st, i) => (
               <div

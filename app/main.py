@@ -13,7 +13,10 @@ from app.db.queries import (
     get_subgraph,
     get_keyword_vs_graph_comparison,
     get_ingested_papers,
+    investigate_with_graph,
+    summarize_research_papers,
 )
+from app.memory import get_research_memory
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -171,6 +174,36 @@ def search_entities(
             "results_count": len(results),
             "results": results
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/agent/investigate")
+def agent_investigate(
+    question: str = Query(..., min_length=2, description="Research question or candidate medicine"),
+    drug_name: Optional[str] = Query(default=None, description="Optional candidate medicine to investigate"),
+    session_id: Optional[str] = Query(default=None, description="Persistent research session identifier"),
+):
+    """Return a graph-grounded research synthesis with its retrieval trace."""
+    try:
+        return investigate_with_graph(question=question, drug_name=drug_name, session_id=session_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/agent/summarize-papers")
+def summarize_papers(
+    question: str = Query(..., min_length=2),
+    drug_name: str = Query(..., min_length=2),
+    session_id: str = Query(default="demo-researcher", min_length=2),
+):
+    try:
+        return summarize_research_papers(question, drug_name, session_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/agent/memory")
+def research_memory(session_id: str = Query(default="demo-researcher", min_length=2)):
+    try:
+        return get_research_memory(session_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

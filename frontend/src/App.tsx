@@ -1,379 +1,430 @@
-import { useState, useEffect } from 'react';
-import { EvidenceChain } from './components/EvidenceChain';
-import { CandidateCard } from './components/CandidateCard';
-import { AgentThinking } from './components/AgentThinking';
-import { BenchmarkModal } from './components/BenchmarkModal';
-import type { CandidateDrug, KeywordBenchmark, ResearchPaperItem } from './types/graph';
+import { useEffect, useState, useRef } from 'react';
+import type { AgentInvestigation, PaperSummary, ResearchMemory } from './types/graph';
 import {
+  ArrowUp,
+  BookOpen,
+  Bot,
+  BrainCircuit,
+  CircleHelp,
+  FileText,
+  FlaskConical,
+  History,
+  Home,
+  LoaderCircle,
+  MessageSquare,
+  Network,
   Search,
   Sparkles,
-  Database,
-  ArrowRight,
-  ShieldCheck,
-  Layers,
-  Terminal,
-  BookOpen,
-  ExternalLink,
-  ChevronDown,
-  ChevronUp,
+  TriangleAlert,
+  User,
 } from 'lucide-react';
 
+const SESSION_ID = 'demo-researcher';
+
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  drug?: string;
+  classification?: string;
+  retrieval?: {
+    multi_hop_paths?: number;
+    clinical_trials?: string[];
+    pubmed_ids?: string[];
+    supporting_records?: number;
+    negative_records?: number;
+  };
+  timestamp: string;
+}
+
+const scenarios = [
+  { label: 'Nintedanib evidence', question: 'Summarize the Nintedanib evidence for IPF', drug: 'Nintedanib', icon: Search },
+  { label: 'Why Imatinib failed', question: 'Why did Imatinib fail in human IPF trials?', drug: 'Imatinib', icon: TriangleAlert },
+  { label: 'Compare mechanisms', question: 'Compare Pirfenidone and Nintedanib mechanisms in IPF', drug: 'Pirfenidone', icon: Network },
+  { label: 'Research memory', question: 'What research context has this session stored?', drug: 'Nintedanib', icon: History },
+];
+
 export function App() {
-  const [diseaseInput, setDiseaseInput] = useState('Idiopathic Pulmonary Fibrosis');
-  const [activeDrug, setActiveDrug] = useState<string>('Nintedanib');
-  const [candidates, setCandidates] = useState<CandidateDrug[]>([]);
-  const [papers, setPapers] = useState<ResearchPaperItem[]>([]);
-  const [benchmarkData, setBenchmarkData] = useState<KeywordBenchmark | null>(null);
-  const [showBenchmark, setShowBenchmark] = useState(false);
-  const [showCypher, setShowCypher] = useState(true);
-  const [showPapers, setShowPapers] = useState(true);
+  const [question, setQuestion] = useState('');
+  const [activeDrug, setActiveDrug] = useState('Nintedanib');
+  const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [memory, setMemory] = useState<ResearchMemory | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch Candidates list from Neo4j Aura
-  const fetchCandidates = async () => {
-    try {
-      const res = await fetch('/api/graph/candidates?disease_id=DIS:IPF');
-      if (res.ok) {
-        const data = await res.json();
-        setCandidates(data.candidates || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch candidates:', err);
-    }
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Fetch Ingested Research Papers from Neo4j Aura
-  const fetchPapers = async () => {
-    try {
-      const res = await fetch('/api/graph/papers');
-      if (res.ok) {
-        const data = await res.json();
-        setPapers(data.papers || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch research papers:', err);
-    }
-  };
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
 
-  // Fetch Benchmark comparison
-  const fetchBenchmark = async () => {
+  const fetchMemory = async () => {
     try {
-      const res = await fetch('/api/graph/comparison');
-      if (res.ok) {
-        const data = await res.json();
-        setBenchmarkData(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch benchmark:', err);
+      const response = await fetch(`/api/agent/memory?session_id=${SESSION_ID}`);
+      if (response.ok) setMemory(await response.json());
+    } catch (e) {
+      console.error(e);
     }
   };
 
   useEffect(() => {
-    fetchCandidates();
-    fetchPapers();
-    fetchBenchmark();
+    fetchMemory();
   }, []);
 
-  const handleInvestigate = (drugName: string, diseaseQuery?: string) => {
-    if (diseaseQuery) {
-      setDiseaseInput(diseaseQuery);
+  const inferDrug = (text: string) =>
+    ['Nintedanib', 'Imatinib', 'Pirfenidone', 'Pamrevlumab', 'Treprostinil'].find((name) =>
+      text.toLowerCase().includes(name.toLowerCase())
+    ) || activeDrug;
+
+  const ask = async (forcedQuestion?: string, forcedDrug?: string) => {
+    const prompt = (forcedQuestion || question).trim();
+    if (!prompt || loading) return;
+
+    const drug = forcedDrug || inferDrug(prompt);
+    setActiveDrug(drug);
+    setQuestion(''); // Clear input box immediately for good UX
+
+    // 1. Add user message
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: prompt,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setLoading(true);
+
+    try {
+      const parameters = new URLSearchParams({
+        question: prompt,
+        drug_name: drug,
+        session_id: SESSION_ID,
+      });
+      const response = await fetch(`/api/agent/investigate?${parameters}`);
+      if (response.ok) {
+        const data: AgentInvestigation = await response.json();
+        const assistantMsg: ChatMessage = {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: data.answer,
+          drug: data.matched_entity || drug,
+          classification: data.classification,
+          retrieval: data.retrieval,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      } else {
+        const errorMsg: ChatMessage = {
+          id: `error-${Date.now()}`,
+          role: 'assistant',
+          content: 'Failed to communicate with MedTrail backend. Please ensure the server is online.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+      }
+      await fetchMemory();
+    } catch (err: any) {
+      const errorMsg: ChatMessage = {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: `Error during graph investigation: ${err?.message || 'Network error'}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setLoading(false);
     }
-    setActiveDrug(drugName);
   };
 
-  const selectedCandidate =
-    candidates.find((c) => c.drug_name.toLowerCase() === activeDrug.toLowerCase()) ||
-    candidates[0];
+  const summarize = async () => {
+    const prompt = question.trim() || `Summarize the connected ${activeDrug} research papers for IPF`;
+    setQuestion('');
+    setLoading(true);
 
-  // Live Cypher Statement executed for currently active investigation
-  const activeCypher = `// Live Cypher Traversal against Neo4j Aura (7743778d.databases.neo4j.io)
-MATCH (d:Disease {name: 'Idiopathic Pulmonary Fibrosis'})
-MATCH (d)-[:ASSOCIATED_WITH]->(g:Gene)-[:ENCODES]->(p:Protein)-[:PARTICIPATES_IN]->(pw:Pathway)
-MATCH (dr:Drug {name: '${activeDrug}'})-[t:TARGETS]->(p)
-MATCH (dr)-[:INVESTIGATED_IN]->(cs:ClinicalStudy)-[:REPORTS]->(ev:Evidence)-[:ABOUT]->(d)
-OPTIONAL MATCH (rp:ResearchPaper)-[:SUPPORTS_OR_REPORTS]->(ev)
-RETURN d.name, pw.name, g.symbol, p.accession, dr.name, cs.nct_id, ev.tier, ev.direction, rp.pmid
-ORDER BY ev.tier ASC;`;
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: `✨ ${prompt}`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setMessages((prev) => [...prev, userMsg]);
 
-  // Filter papers relevant to active investigation
-  const relevantPapers = papers.filter(
-    (p) => p.drug_name.toLowerCase() === activeDrug.toLowerCase() || p.drug_name === 'General IPF'
-  );
+    try {
+      const parameters = new URLSearchParams({
+        question: prompt,
+        drug_name: activeDrug,
+        session_id: SESSION_ID,
+      });
+      const response = await fetch(`/api/agent/summarize-papers?${parameters}`);
+      if (response.ok) {
+        const data: PaperSummary = await response.json();
+        const assistantMsg: ChatMessage = {
+          id: `summary-${Date.now()}`,
+          role: 'assistant',
+          content: data.answer,
+          drug: activeDrug,
+          classification: 'supported',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      }
+      await fetchMemory();
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col">
-      {/* 1. Slim, Minimalist Header */}
-      <header className="border-b border-slate-200 bg-white sticky top-0 z-30 shadow-2xs">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
-              <Layers size={18} />
-            </div>
-            <div>
-              <span className="font-bold text-slate-900 text-base tracking-tight">MedTrail</span>
-              <span className="text-xs text-slate-400 ml-2 hidden sm:inline">
-                Graph-Powered Research Discovery
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <Database size={12} className="text-slate-400" />
-              <span className="font-medium text-slate-700">Neo4j Aura Live</span>
-              <span className="text-slate-400">•</span>
-              <span className="text-slate-500">67 Nodes • 135 Edges</span>
-            </div>
-
-            <button
-              onClick={() => setShowBenchmark(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition"
-            >
-              <Sparkles size={13} />
-              <span>Graph vs Keyword Search</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* 2. Main Investigation Container */}
-      <main className="max-w-5xl mx-auto px-4 py-8 flex-1 w-full space-y-6">
-        {/* Disease Investigation Bar */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">
-              Investigate Disease Relationships & Evidence
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Ask MedTrail to traverse the Neo4j knowledge graph, uncover indirect multi-hop pathways, and audit research literature with transparent evidence tiers.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search
-                size={16}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                type="text"
-                value={diseaseInput}
-                onChange={(e) => setDiseaseInput(e.target.value)}
-                placeholder="Enter disease to investigate..."
-                className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
-              />
-            </div>
-            <button
-              onClick={() => handleInvestigate('Nintedanib')}
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5"
-            >
-              <span>Investigate</span>
-              <ArrowRight size={14} />
-            </button>
-          </div>
-
-          {/* Quick Investigation Presets */}
-          <div className="flex items-center gap-2 flex-wrap pt-1 text-xs">
-            <span className="text-slate-400 font-medium">Sample Investigations:</span>
-            <button
-              onClick={() => handleInvestigate('Nintedanib', 'Idiopathic Pulmonary Fibrosis')}
-              className={`px-3 py-1 rounded-full font-medium transition ${
-                activeDrug === 'Nintedanib'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              🌟 How Nintedanib was Discovered (Known-Path Validation)
-            </button>
-            <button
-              onClick={() => handleInvestigate('Imatinib', 'Idiopathic Pulmonary Fibrosis')}
-              className={`px-3 py-1 rounded-full font-medium transition ${
-                activeDrug === 'Imatinib'
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              ⚠️ Why Imatinib Failed (Preserved Conflicting Evidence)
-            </button>
-            <button
-              onClick={() => handleInvestigate('Pirfenidone', 'Idiopathic Pulmonary Fibrosis')}
-              className={`px-3 py-1 rounded-full font-medium transition ${
-                activeDrug === 'Pirfenidone'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              🧪 Pirfenidone Mechanism (TGF-β Pathway)
-            </button>
-          </div>
-        </div>
-
-        {/* 3. Live AI Agent Thought Stream */}
-        <AgentThinking activeDrug={activeDrug} />
-
-        {/* 4. Multi-Hop Evidence Trail */}
-        <EvidenceChain drugName={activeDrug} />
-
-        {/* 5. Live Cypher Query Inspector (Shows Real Neo4j Cypher in Action) */}
-        <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 text-xs shadow-md overflow-hidden text-slate-300">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <Terminal size={14} className="text-emerald-400" />
-              <span className="font-mono font-semibold text-white">Live Neo4j Cypher Query</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
-                bolt://7743778d.databases.neo4j.io
-              </span>
-            </div>
-            <button
-              onClick={() => setShowCypher(!showCypher)}
-              className="text-slate-400 hover:text-white transition flex items-center gap-1 text-[11px]"
-            >
-              <span>{showCypher ? 'Hide Cypher' : 'View Cypher'}</span>
-              {showCypher ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
-          </div>
-
-          {showCypher && (
-            <div className="pt-3 space-y-2">
-              <pre className="font-mono text-[11px] leading-relaxed text-emerald-300 overflow-x-auto bg-slate-950/70 p-3 rounded-lg border border-slate-800">
-                {activeCypher}
-              </pre>
-              <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span>Database: <strong className="text-slate-200">7743778d</strong></span>
-                <span className="text-emerald-400">⚡ Traversal latency: ~38ms • Graph constraints active</span>
-              </div>
-            </div>
+    <div className="min-h-screen bg-[#fcfcfd] text-slate-900 flex font-sans">
+      {/* Sidebar Navigation */}
+      <aside className="hidden md:flex fixed inset-y-0 left-0 w-[68px] bg-white border-r border-slate-200 flex-col items-center py-3 z-20 shadow-2xs">
+        <button
+          onClick={() => setMessages([])}
+          title="New Investigation Chat"
+          className="h-10 w-10 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 grid place-items-center shadow-xs transition"
+        >
+          <span className="text-2xl font-light leading-none">+</span>
+        </button>
+        <div className="mt-6 flex flex-col gap-2 text-slate-500">
+          {[Home, Search, BookOpen, MessageSquare, FileText, Network, BrainCircuit].map(
+            (Icon, index) => (
+              <button
+                key={index}
+                className={`h-10 w-10 grid place-items-center rounded-xl transition ${
+                  index === 0 ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-100 hover:text-slate-800'
+                }`}
+              >
+                <Icon size={18} />
+              </button>
+            )
           )}
         </div>
-
-        {/* 6. Ingested PubMed Research Papers in Neo4j */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <BookOpen size={16} className="text-blue-600" />
-              <h3 className="font-bold text-slate-900 text-sm">
-                Ingested Research Papers from Literature ({papers.length} PubMed Records in Neo4j)
-              </h3>
-            </div>
-            <button
-              onClick={() => setShowPapers(!showPapers)}
-              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-            >
-              {showPapers ? 'Collapse Papers' : 'Expand Papers'}
-            </button>
+        <div className="mt-auto flex flex-col gap-3 items-center text-slate-400">
+          <CircleHelp size={18} />
+          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-xs font-bold grid place-items-center">
+            MT
           </div>
+        </div>
+      </aside>
 
-          {showPapers && (
-            <div className="space-y-2.5">
-              {relevantPapers.map((paper) => (
+      {/* Main Chat Interface */}
+      <main className="flex-1 md:ml-[68px] min-h-screen flex flex-col">
+        {/* Top Header */}
+        <header className="h-16 flex items-center justify-between px-5 sm:px-8 border-b border-slate-100 bg-white/80 backdrop-blur sticky top-0 z-10">
+          <div className="flex items-center gap-2.5 font-semibold text-slate-800">
+            <div className="relative h-7 w-7">
+              <span className="absolute inset-0 rotate-45 rounded-sm bg-cyan-400" />
+              <span className="absolute inset-[6px] rotate-45 rounded-sm bg-blue-600" />
+            </div>
+            <span>MedTrail</span>
+            <span className="text-xs font-normal text-slate-400 hidden sm:inline">
+              Research Intelligence
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-full">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Neo4j Aura Live (79 Nodes • 159 Edges)
+            </span>
+            <span className="hidden sm:inline-flex items-center gap-1 bg-violet-50 text-violet-700 border border-violet-100 px-2.5 py-1 rounded-full font-medium">
+              <Sparkles size={12} /> Groq LLM Active
+            </span>
+            {memory && (
+              <span className="hidden md:inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full text-xs">
+                {memory.messages.length} memory turns
+              </span>
+            )}
+          </div>
+        </header>
+
+        {/* Conversation Stream */}
+        <div className="flex-1 max-w-[920px] w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
+          {messages.length === 0 ? (
+            /* Empty State Hero */
+            <div className="text-center py-10 sm:py-14 space-y-4">
+              <div className="inline-flex items-center gap-2 text-sm text-slate-600 bg-slate-100/80 px-3 py-1 rounded-full">
+                <FlaskConical size={16} className="text-cyan-600" /> IPF Research Dossier
+              </div>
+              <h1 className="text-3xl sm:text-5xl font-semibold tracking-tight text-slate-950">
+                What would you like to learn
+                <br className="hidden sm:block" /> from the IPF evidence?
+              </h1>
+              <p className="max-w-2xl mx-auto text-sm sm:text-base text-slate-500 leading-relaxed">
+                Explore a deeply curated disease graph: mechanisms, clinical trials, conflicting
+                findings, and source-bounded AI paper synthesis with Groq &amp; Neo4j.
+              </p>
+            </div>
+          ) : (
+            /* Active Message History */
+            <div className="space-y-5">
+              {messages.map((msg) => (
                 <div
-                  key={paper.id}
-                  className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition space-y-1.5 text-xs"
+                  key={msg.id}
+                  className={`flex gap-3 sm:gap-4 ${
+                    msg.role === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="font-semibold text-slate-900 leading-snug">
-                      {paper.title}
-                    </span>
-                    <a
-                      href={`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shrink-0"
+                  {msg.role === 'assistant' && (
+                    <div
+                      className={`h-8 w-8 rounded-xl grid place-items-center shrink-0 mt-0.5 ${
+                        msg.classification === 'warning'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-blue-600 text-white'
+                      }`}
                     >
-                      <span>PMID:{paper.pmid}</span>
-                      <ExternalLink size={10} />
-                    </a>
-                  </div>
+                      {msg.classification === 'warning' ? <TriangleAlert size={16} /> : <Bot size={16} />}
+                    </div>
+                  )}
 
-                  <div className="text-[11px] text-slate-500">
-                    <span>{paper.journal}</span> • <span>{paper.pub_date}</span>
-                    {paper.drug_name && (
-                      <span className="ml-2 font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">
-                        {paper.drug_name}
+                  <div
+                    className={`max-w-[85%] rounded-2xl p-4 sm:p-5 text-sm leading-relaxed shadow-2xs ${
+                      msg.role === 'user'
+                        ? 'bg-blue-600 text-white rounded-tr-xs'
+                        : msg.classification === 'warning'
+                        ? 'bg-amber-50/70 border border-amber-200 text-slate-800 rounded-tl-xs'
+                        : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-4 mb-2">
+                      <span className="font-semibold text-xs tracking-tight">
+                        {msg.role === 'user' ? 'Researcher' : 'MedTrail Agent (Neo4j + Groq)'}
                       </span>
+                      <span className="text-[10px] opacity-70">{msg.timestamp}</span>
+                    </div>
+
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+
+                    {/* Metadata / Provenance Badges for Assistant */}
+                    {msg.retrieval && (
+                      <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
+                        {msg.retrieval.multi_hop_paths ? (
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 font-medium">
+                            ⚡ {msg.retrieval.multi_hop_paths} multi-hop paths
+                          </span>
+                        ) : null}
+                        {msg.retrieval.clinical_trials?.map((trial) => (
+                          <span
+                            key={trial}
+                            className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-mono font-medium"
+                          >
+                            Trial: {trial}
+                          </span>
+                        ))}
+                        {msg.retrieval.pubmed_ids?.slice(0, 3).map((pmid) => (
+                          <a
+                            key={pmid}
+                            href={`https://pubmed.ncbi.nlm.nih.gov/${pmid}/`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 hover:underline font-mono"
+                          >
+                            PMID:{pmid}
+                          </a>
+                        ))}
+                      </div>
                     )}
                   </div>
 
-                  {paper.abstract && (
-                    <p className="text-[11px] text-slate-600 leading-relaxed line-clamp-2">
-                      {paper.abstract}
-                    </p>
+                  {msg.role === 'user' && (
+                    <div className="h-8 w-8 rounded-xl bg-slate-200 text-slate-700 grid place-items-center shrink-0 mt-0.5">
+                      <User size={16} />
+                    </div>
                   )}
                 </div>
               ))}
+
+              {/* Live Loading Pulse */}
+              {loading && (
+                <div className="flex gap-3 items-center text-xs text-slate-500 pl-1">
+                  <div className="h-8 w-8 rounded-xl bg-blue-50 text-blue-600 grid place-items-center shrink-0">
+                    <LoaderCircle size={16} className="animate-spin" />
+                  </div>
+                  <span className="animate-pulse font-medium">
+                    Traversing Neo4j knowledge graph &amp; synthesizing answer with Groq LLM...
+                  </span>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
             </div>
           )}
-        </div>
 
-        {/* 7. Candidate Investigation Results */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900">
-              Candidate Medicines & Evidence Hierarchy for {diseaseInput}
-            </h2>
-            <span className="text-xs text-slate-500">
-              Ordered by highest evidence tier first
-            </span>
+          {/* Quick Scenario Buttons */}
+          <div className="flex flex-wrap justify-center gap-2 pt-2">
+            {scenarios.map(({ label, question: scenarioQuestion, drug, icon: Icon }) => (
+              <button
+                key={label}
+                onClick={() => ask(scenarioQuestion, drug)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-700 hover:border-blue-400 hover:text-blue-700 hover:shadow-xs transition"
+              >
+                <Icon size={14} className="text-slate-400" />
+                {label}
+              </button>
+            ))}
           </div>
 
-          {/* Detailed view of currently focused candidate */}
-          {selectedCandidate && (
-            <CandidateCard
-              candidate={selectedCandidate}
-              isSelected={true}
-              onSelect={() => {}}
+          {/* Chat Input Container */}
+          <div className="bg-white rounded-[22px] border border-slate-200 shadow-[0_12px_40px_-15px_rgba(15,23,42,.18)] text-left overflow-hidden sticky bottom-4 z-20">
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  ask();
+                }
+              }}
+              placeholder="Ask about Nintedanib, Imatinib, Pirfenidone, or a research finding... (Press Enter to send)"
+              className="w-full h-24 resize-none outline-none p-4 text-[14px] placeholder:text-slate-400"
             />
-          )}
-
-          {/* Quick list of other candidates to inspect */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-            {candidates
-              .filter((c) => c.drug_name.toLowerCase() !== activeDrug.toLowerCase())
-              .map((cand) => (
-                <div
-                  key={cand.drug_id}
-                  onClick={() => handleInvestigate(cand.drug_name)}
-                  className="bg-white rounded-xl border border-slate-200 p-4 hover:border-slate-300 hover:shadow-xs transition cursor-pointer flex flex-col justify-between space-y-2 text-xs"
+            <div className="border-t border-slate-100 px-3 py-2 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQuestion('')}
+                  title="Clear prompt"
+                  className="h-8 w-8 grid place-items-center rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-500 text-sm"
                 >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900 text-sm">{cand.drug_name}</span>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                        Tier {cand.best_tier}
-                      </span>
-                    </div>
-                    <p className="text-slate-500 text-[11px] line-clamp-2 mt-1">
-                      {cand.mechanism}
-                    </p>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-blue-600 font-medium text-[11px]">
-                    <span>Inspect Evidence Trail</span>
-                    <ArrowRight size={12} />
-                  </div>
-                </div>
-              ))}
+                  ✕
+                </button>
+                <span className="text-[11px] text-slate-400 hidden sm:inline">
+                  Press <strong>Enter</strong> to send, <strong>Shift+Enter</strong> for newline
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={summarize}
+                  disabled={loading}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 hover:bg-violet-50 text-violet-700 border border-violet-200 rounded-lg transition"
+                >
+                  <Sparkles size={14} /> Summarize papers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => ask()}
+                  disabled={loading || !question.trim()}
+                  className="h-8 w-8 grid place-items-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:bg-slate-200 disabled:text-slate-400 transition shadow-xs"
+                >
+                  {loading ? (
+                    <LoaderCircle size={15} className="animate-spin" />
+                  ) : (
+                    <ArrowUp size={16} />
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* 8. Scientific Disclaimer */}
-        <div className="bg-slate-100/80 border border-slate-200 rounded-xl p-4 text-xs text-slate-600 space-y-1">
-          <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-            <ShieldCheck size={14} className="text-blue-600" />
-            MedTrail Scientific Limitations & Grounding Guarantee
-          </div>
-          <p className="leading-relaxed">
-            MedTrail is an exploratory hypothesis-generation tool. Indirect graph paths indicate biological connections worth investigating, but do not establish clinical efficacy or safety. All conclusions preserve negative findings and provide direct citations to ClinicalTrials.gov and PubMed records.
+          <p className="text-[11px] text-slate-400 text-center pb-2">
+            Demo scope: high-depth IPF dossier grounded in Neo4j AuraDB &amp; Groq (llama/gpt-oss).
           </p>
         </div>
       </main>
-
-      {/* 9. Benchmark Modal */}
-      {showBenchmark && (
-        <BenchmarkModal
-          data={benchmarkData}
-          onClose={() => setShowBenchmark(false)}
-        />
-      )}
     </div>
   );
 }

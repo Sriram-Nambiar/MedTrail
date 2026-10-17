@@ -112,3 +112,34 @@ export interface ResearchPaperItem {
   evidence_direction?: string;
 }
 
+export interface AgentInvestigation {
+  question: string;
+  matched_entity: string | null;
+  answer: string;
+  classification: 'supported' | 'warning' | 'insufficient';
+  retrieval: {
+    multi_hop_paths: number;
+    supporting_records?: number;
+    negative_records?: number;
+    clinical_trials?: string[];
+    pubmed_ids?: string[];
+    matched_entities?: string[];
+  };
+  caveat: string;
+}
+
+export interface ResearchMemory {
+  session_id: string;
+  messages: { role: string; content: string; created_at: string }[];
+  entities: { name: string; type: string }[];
+  reasoning_traces: number;
+}
+
+export interface PaperSummary {
+  answer: string;
+  session_id: string;
+  supporting_records: number;
+  negative_records: number;
+  synthesis_mode: 'groq_grounded' | 'extractive_fallback';
+}
+

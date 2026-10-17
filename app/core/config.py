@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     AURA_INSTANCEID: str = Field(default="")
     AURA_INSTANCENAME: str = Field(default="")
     GROQ_API_KEY: str = Field(default="")
-    GROQ_MODEL: str = Field(default="llama-3.3-70b-versatile")
+    GROQ_MODEL: str = Field(default="openai/gpt-oss-120b")
 
     class Config:
         env_file = ".env"
