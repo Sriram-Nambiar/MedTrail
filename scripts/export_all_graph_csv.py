@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.db.neo4j import neo4j_conn
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "neo4j_import"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "import_files"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 def export_all():

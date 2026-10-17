@@ -1,0 +1,68 @@
+id,label,name,description
+CS:NCT00130520,ClinicalStudy,A Phase II Randomized Double-Blind Placebo-Controlled Study of Imatinib Mesylate in Patients With Idiopathic Pulmonary Fibrosis,
+CS:NCT00287716,ClinicalStudy,Clinical Studies Assessing Pirfenidone in Idiopathic Pulmonary Fibrosis (CAPACITY 004),
+CS:NCT00514683,ClinicalStudy,A 12-Month Phase II Trial of BIBF 1120 in Patients With Idiopathic Pulmonary Fibrosis (TOMORROW),
+CS:NCT01335464,ClinicalStudy,Efficacy and Safety of BIBF 1120 in Patients With Idiopathic Pulmonary Fibrosis (INPULSIS-1),
+CS:NCT01335477,ClinicalStudy,Efficacy and Safety of BIBF 1120 in Patients With Idiopathic Pulmonary Fibrosis (INPULSIS-2),
+CS:NCT01366209,ClinicalStudy,A Study of Pirfenidone in Patients With Idiopathic Pulmonary Fibrosis (ASCEND),
+CS:NCT03955146,ClinicalStudy,Safety and Efficacy of Pamrevlumab in Subjects With Idiopathic Pulmonary Fibrosis (ZEPHYRUS-1),
+DIS:IPF,Disease,Idiopathic Pulmonary Fibrosis,"A chronic, progressive fibrosing interstitial pneumonia of unknown cause, occurring primarily in older adults, limited to the lungs, and associated with progressive worsening of dyspnea and lung function."
+DRUG:IMATINIB,Drug,Imatinib,"Selective tyrosine kinase inhibitor targeting BCR-ABL, PDGFRalpha/beta, and c-KIT; investigated for antifibrotic properties in IPF."
+DRUG:NINTEDANIB,Drug,Nintedanib,"Triple angiokinase inhibitor simultaneously blocking VEGFR1-3, FGFR1-3, and PDGFRalpha/beta kinase activity."
+DRUG:PAMREVLUMAB,Drug,Pamrevlumab,Recombinant human IgG1 monoclonal antibody neutralizing connective tissue growth factor (CTGF / CCN2).
+DRUG:PIRFENIDONE,Drug,Pirfenidone,"Antifibrotic pyridone derivative that downregulates TGF-beta production, reduces collagen synthesis, and suppresses myofibroblast differentiation."
+DRUG:TREPROSTINIL,Drug,Treprostinil,"Synthetic analogue of prostacyclin activating PTGIR, stimulating intracellular cAMP, promoting pulmonary vasodilation and inhibiting fibroblast proliferation."
+EV:IMAT:01,Evidence,EV:IMAT:01,
+EV:IMAT:02,Evidence,EV:IMAT:02,
+EV:NINT:01,Evidence,EV:NINT:01,
+EV:PAMR:01,Evidence,EV:PAMR:01,
+EV:PIRF:01,Evidence,EV:PIRF:01,
+GENE:ABL1,Gene,"ABL Proto-Oncogene 1, Non-Receptor Tyrosine Kinase",
+GENE:CCN2,Gene,Cellular Communication Network Factor 2 (CTGF),
+GENE:FGFR1,Gene,Fibroblast Growth Factor Receptor 1,
+GENE:FGFR2,Gene,Fibroblast Growth Factor Receptor 2,
+GENE:FGFR3,Gene,Fibroblast Growth Factor Receptor 3,
+GENE:FLT1,Gene,Fms Related Receptor Tyrosine Kinase 1 (VEGFR1),
+GENE:KDR,Gene,Kinase Insert Domain Receptor (VEGFR2),
+GENE:KIT,Gene,"KIT Proto-Oncogene, Receptor Tyrosine Kinase",
+GENE:PDGFRA,Gene,Platelet Derived Growth Factor Receptor Alpha,
+GENE:PDGFRB,Gene,Platelet Derived Growth Factor Receptor Beta,
+GENE:PTGIR,Gene,Prostaglandin I2 Receptor,
+GENE:TGFB1,Gene,Transforming Growth Factor Beta 1,
+HYP:IMATINIB,Hypothesis,Selective PDGF/c-Kit Tyrosine Kinase Blockade Fails in Clinical Human IPF,"Although selective PDGF receptor and c-KIT blockade attenuates fibrosis in murine bleomycin models, human Phase 2 trials demonstrated lack of clinical benefit on survival or FVC, demonstrating redundant cytokine drives (FGFR, TGF-beta) in human pathogenesis."
+HYP:NINTEDANIB,Hypothesis,Simultaneous Triple-Angiokinase Receptor Inhibition Slows Lung Function Loss in IPF,"Concurrent blockade of FGFR, PDGFR, and VEGFR cascades inhibits fibroblast proliferation, migration, and extracellular matrix deposition, overcoming compensatory signaling loops to slow FVC decline in IPF."
+PW:FGFR,Pathway,FGFR Signaling Pathway,
+PW:PDGF,Pathway,Signaling by PDGF,
+PW:RTK,Pathway,Signaling by Receptor Tyrosine Kinases,
+PW:TGFB,Pathway,Signaling by TGF-beta Receptor Complex,
+PW:VEGF,Pathway,Signaling by VEGF,
+PROT:P00519,Protein,Tyrosine-protein kinase ABL1,
+PROT:P01137,Protein,Transforming growth factor beta-1,
+PROT:P09619,Protein,Platelet-derived growth factor receptor beta,
+PROT:P10721,Protein,Mast/stem cell growth factor receptor Kit,
+PROT:P11362,Protein,Fibroblast growth factor receptor 1,
+PROT:P16234,Protein,Platelet-derived growth factor receptor alpha,
+PROT:P17948,Protein,Vascular endothelial growth factor receptor 1,
+PROT:P21802,Protein,Fibroblast growth factor receptor 2,
+PROT:P22607,Protein,Fibroblast growth factor receptor 3,
+PROT:P29279,Protein,Connective tissue growth factor,
+PROT:P35968,Protein,Vascular endothelial growth factor receptor 2,
+PROT:P43119,Protein,Prostacyclin receptor,
+RP:PMID15161911,ResearchPaper,Imatinib as a Novel Antifibrotic Agent in Bleomycin-Induced Pulmonary Fibrosis in Mice,"Preclinical investigation in murine bleomycin models demonstrated that imatinib attenuated lung fibrosis and collagen accumulation by blocking PDGF receptor phosphorylation in lung fibroblasts, providing the initial preclinical hypothesis for clinical testing."
+RP:PMID18400030,ResearchPaper,Pirfenidone in Idiopathic Pulmonary Fibrosis: Phase II Clinical Evaluation,"A double-blind, randomized trial of pirfenidone versus placebo demonstrated significant reduction in the rate of decline in vital capacity and a significant reduction in the frequency of acute exacerbations of idiopathic pulmonary fibrosis."
+RP:PMID19897772,ResearchPaper,"A Randomized, Controlled Trial of Imatinib in Idiopathic Pulmonary Fibrosis","In this randomized, double-blind, placebo-controlled trial of 119 IPF patients, imatinib mesylate 600 mg daily did not affect survival (HR 0.94; 95% CI 0.44-2.02) or the rate of FVC decline over 96 weeks. These findings demonstrate that targeting the PDGF receptor alone is not sufficient to halt progressive fibrogenesis in human disease."
+RP:PMID21926344,ResearchPaper,Mode of Action of Nintedanib (BIBF 1120) as an Antifibrotic and Antiangiogenic Agent,"BIBF 1120 was identified as an indolinone derivative that concurrently inhibits receptor tyrosine kinases VEGFR, FGFR and PDGFR at low nanomolar concentrations, preventing ligand-dependent autophosphorylation and mitogenesis."
+RP:PMID24836310,ResearchPaper,Efficacy and Safety of Nintedanib in Idiopathic Pulmonary Fibrosis,"In two 52-week, randomized, double-blind, phase 3 trials (INPULSIS-1 and INPULSIS-2) involving 1066 patients, nintedanib significantly slowed disease progression by reducing the annual rate of decline in forced vital capacity in patients with idiopathic pulmonary fibrosis (-114.7 mL/year vs -239.9 mL/year in INPULSIS-1; -113.6 mL/year vs -207.3 mL/year in INPULSIS-2)."
+RP:PMID24836312,ResearchPaper,A Phase 3 Trial of Pirfenidone in Patients with Idiopathic Pulmonary Fibrosis,"The ASCEND trial confirmed that pirfenidone significantly reduced disease progression in patients with IPF, meeting the primary endpoint of slowing the rate of decline in forced vital capacity, along with positive effects on secondary endpoints."
+RP:PMID25251644,ResearchPaper,Fibroblast Growth Factor Receptor Signaling Promotes Pulmonary Fibrosis via Epithelial Mesenchymal Transition,"Evaluation of human idiopathic pulmonary fibrosis biopsies demonstrated hyperactivation of FGFR1 and FGFR2 in alveolar epithelial cells and fibroblastic foci, driving epithelial-mesenchymal transition and extracellular matrix secretion."
+RP:PMID26196288,ResearchPaper,Receptor Tyrosine Kinase Redundancy Explains Resistance to Monotherapy in Idiopathic Pulmonary Fibrosis,"Pharmacological analysis reveals that single-target kinase inhibition (such as selective PDGF receptor blockade with imatinib) permits compensatory activation of fibroblast growth factor (FGF) and vascular endothelial growth factor (VEGF) signaling cascades, explaining clinical resistance and failure of single-agent monotargeting."
+RP:PMID28813352,ResearchPaper,Connective Tissue Growth Factor Neutralization Attenuates Preclinical Pulmonary Fibrosis,"Monoclonal antibody blockade of CTGF (CCN2) with FG-3019 suppressed lung collagen deposition and improved histology in murine pulmonary fibrosis models, serving as the biological proof of concept preceding human randomized clinical testing."
+RP:PMID31545620,ResearchPaper,Nintedanib in Patients with Progressive Fibrosing Interstitial Lung Diseases (INBUILD Trial),"In patients with progressive fibrosing interstitial lung diseases, the annual rate of decline in forced vital capacity was significantly lower in patients who received nintedanib than in those who received placebo (-80.8 mL/year vs -187.8 mL/year), showing shared fibrotic signaling across etiologies."
+RP:PMID33440058,ResearchPaper,Inhaled Treprostinil in Pulmonary Hypertension Due to Interstitial Lung Disease (INCREASE Trial),"In patients with pulmonary hypertension associated with interstitial lung disease (PH-ILD), inhaled treprostinil improved 6-minute walk distance by 31 meters compared with placebo and significantly reduced NT-proBNP levels and clinical worsening events."
+RP:PMID38843513,ResearchPaper,Trial of Pamrevlumab in Idiopathic Pulmonary Fibrosis: Results of the Phase 3 ZEPHYRUS-1 Study,"In the Phase 3 ZEPHYRUS-1 trial, pamrevlumab (anti-CTGF mAb) did not show a statistically significant difference in FVC decline versus placebo at week 48, highlighting that targeting connective tissue growth factor alone did not replicate Phase 2 promise."
+SE:CRAMPS,SideEffect,Muscle Spasms and Cramps,
+SE:DIARRHEA,SideEffect,Diarrhea,
+SE:EDEMA,SideEffect,Peripheral Edema,
+SE:LIVER_ENZYMES,SideEffect,Elevated Liver Enzymes (AST/ALT),
+SE:NAUSEA,SideEffect,Nausea,
+SE:RASH,SideEffect,Photosensitivity Rash,

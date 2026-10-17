@@ -2,7 +2,7 @@ import csv
 import os
 from pathlib import Path
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "neo4j_import"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "import_files"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # 1. Landmark & Real PubMed Research Papers for IPF
