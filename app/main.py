@@ -29,8 +29,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from pathlib import Path
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+assets_dir = frontend_dist / "assets"
+if assets_dir.exists():
+    app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
 @app.get("/")
-def root():
+def serve_frontend():
+    index_file = frontend_dist / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    return {
+        "app": settings.APP_NAME,
+        "status": "online",
+        "message": "Frontend build not detected. Please run 'npm run build' in frontend/."
+    }
+
+@app.get("/api")
+def api_root():
     return {
         "app": settings.APP_NAME,
         "status": "online",
@@ -41,7 +61,9 @@ def root():
             "paths": "/api/graph/paths?drug_name=Nintedanib",
             "candidates": "/api/graph/candidates?disease_id=DIS:IPF",
             "conflicts": "/api/graph/conflicts?disease_id=DIS:IPF",
-            "search": "/api/graph/search?q=fibrosis"
+            "search": "/api/graph/search?q=fibrosis",
+            "subgraph": "/api/graph/subgraph?drug_name=Nintedanib",
+            "comparison": "/api/graph/comparison"
         }
     }
 
@@ -141,13 +163,4 @@ def search_entities(
 @app.on_event("shutdown")
 def shutdown_event():
     neo4j_conn.close_driver()
-
-# Mount frontend production build if available
-import os
-from pathlib import Path
-from fastapi.staticfiles import StaticFiles
-
-frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
-if frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
 
