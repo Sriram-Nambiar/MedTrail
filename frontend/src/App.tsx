@@ -1,46 +1,29 @@
 import { useState, useEffect } from 'react';
-import { GraphCanvas } from './components/GraphCanvas';
-import { EntityInspector } from './components/EntityInspector';
-import { CandidateTable } from './components/CandidateTable';
-import { BenchmarkModal } from './components/BenchmarkModal';
+import { EvidenceChain } from './components/EvidenceChain';
+import { CandidateCard } from './components/CandidateCard';
 import { AgentThinking } from './components/AgentThinking';
-import type { GraphNode, GraphLink, CandidateDrug, KeywordBenchmark, SubgraphResponse } from './types/graph';
-import { GitBranch, Table as TableIcon, Sparkles, Database } from 'lucide-react';
+import { BenchmarkModal } from './components/BenchmarkModal';
+import type { CandidateDrug, KeywordBenchmark } from './types/graph';
+import {
+  Search,
+  Sparkles,
+  Database,
+  ArrowRight,
+  ShieldCheck,
+  Layers,
+} from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'graph' | 'table'>('graph');
-  const [selectedDrug, setSelectedDrug] = useState<string>('Nintedanib');
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-
-  const [nodes, setNodes] = useState<GraphNode[]>([]);
-  const [links, setLinks] = useState<GraphLink[]>([]);
+  const [diseaseInput, setDiseaseInput] = useState('Idiopathic Pulmonary Fibrosis');
+  const [activeDrug, setActiveDrug] = useState<string>('Nintedanib');
   const [candidates, setCandidates] = useState<CandidateDrug[]>([]);
   const [benchmarkData, setBenchmarkData] = useState<KeywordBenchmark | null>(null);
   const [showBenchmark, setShowBenchmark] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  // Fetch Subgraph for active drug preset
-  const fetchSubgraph = async (drugName: string) => {
-    try {
-      setLoading(true);
-      const url = `/api/graph/subgraph?drug_name=${encodeURIComponent(drugName)}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data: SubgraphResponse = await res.json();
-        setNodes(data.nodes);
-        setLinks(data.links);
-      }
-    } catch (err) {
-      console.error('Failed to fetch subgraph:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Fetch Candidates list
   const fetchCandidates = async () => {
     try {
-      const res = await fetch('/api/graph/candidates');
+      const res = await fetch('/api/graph/candidates?disease_id=DIS:IPF');
       if (res.ok) {
         const data = await res.json();
         setCandidates(data.candidates || []);
@@ -64,180 +47,199 @@ export function App() {
   };
 
   useEffect(() => {
-    fetchSubgraph(selectedDrug);
     fetchCandidates();
     fetchBenchmark();
-  }, [selectedDrug]);
+  }, []);
 
-  const handleSelectDrug = (drugName: string) => {
-    setSelectedDrug(drugName);
-    setSelectedNode(null);
-    if (activeTab !== 'graph') {
-      setActiveTab('graph');
+  const handleInvestigate = (drugName: string, diseaseQuery?: string) => {
+    if (diseaseQuery) {
+      setDiseaseInput(diseaseQuery);
     }
+    setActiveDrug(drugName);
   };
 
+  const selectedCandidate =
+    candidates.find((c) => c.drug_name.toLowerCase() === activeDrug.toLowerCase()) ||
+    candidates[0];
+
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-50 text-slate-800 font-sans">
-      {/* 1. Header (Minimalist & Uncluttered) */}
-      <header className="h-14 border-b border-slate-200 bg-white px-5 flex items-center justify-between shrink-0 shadow-2xs z-30">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
-            <GitBranch size={18} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col">
+      {/* 1. Slim, Minimalist Header */}
+      <header className="border-b border-slate-200 bg-white sticky top-0 z-30 shadow-2xs">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
+              <Layers size={18} />
+            </div>
+            <div>
               <span className="font-bold text-slate-900 text-base tracking-tight">MedTrail</span>
-              <span className="text-[11px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
-                Idiopathic Pulmonary Fibrosis (IPF)
+              <span className="text-xs text-slate-400 ml-2 hidden sm:inline">
+                Graph-Powered Research Discovery
               </span>
             </div>
           </div>
-        </div>
 
-        {/* Database Status indicator */}
-        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <Database size={13} className="text-slate-400" />
-          <span className="font-medium text-slate-700">Neo4j Aura Live</span>
-          <span className="text-slate-400">•</span>
-          <span className="text-slate-500">61 nodes & 93 edges</span>
-        </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <Database size={12} className="text-slate-400" />
+              <span>Neo4j Aura Live</span>
+              <span className="text-slate-400">•</span>
+              <span className="text-slate-500 font-medium">61 Curated Entities</span>
+            </div>
 
-        {/* View Switchers */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
             <button
-              onClick={() => setActiveTab('graph')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition ${
-                activeTab === 'graph'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => setShowBenchmark(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition"
             >
-              <GitBranch size={14} />
-              <span>Graph View</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('table')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition ${
-                activeTab === 'table'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <TableIcon size={14} />
-              <span>Candidate Ranking</span>
+              <Sparkles size={13} />
+              <span>Graph vs Keyword Search</span>
             </button>
           </div>
-
-          <button
-            onClick={() => setShowBenchmark(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition"
-          >
-            <Sparkles size={13} />
-            <span className="hidden md:inline">Graph vs Keyword</span>
-          </button>
         </div>
       </header>
 
-      {/* 2. Uncluttered Preset Exploration Strip */}
-      <div className="h-11 border-b border-slate-200 bg-white/70 backdrop-blur-xs px-5 flex items-center gap-2 shrink-0 overflow-x-auto text-xs">
-        <span className="text-slate-400 font-medium whitespace-nowrap text-[11px] uppercase tracking-wider mr-1">
-          Explore Paths:
-        </span>
-
-        <button
-          onClick={() => handleSelectDrug('Nintedanib')}
-          className={`px-3 py-1 rounded-full font-medium transition whitespace-nowrap ${
-            selectedDrug === 'Nintedanib'
-              ? 'bg-blue-600 text-white shadow-2xs'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          🌟 Rediscover Nintedanib
-        </button>
-
-        <button
-          onClick={() => handleSelectDrug('Imatinib')}
-          className={`px-3 py-1 rounded-full font-medium transition whitespace-nowrap ${
-            selectedDrug === 'Imatinib'
-              ? 'bg-amber-600 text-white shadow-2xs'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          ⚠️ Imatinib Conflicting Evidence
-        </button>
-
-        <button
-          onClick={() => handleSelectDrug('Pirfenidone')}
-          className={`px-3 py-1 rounded-full font-medium transition whitespace-nowrap ${
-            selectedDrug === 'Pirfenidone'
-              ? 'bg-blue-600 text-white shadow-2xs'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          🧪 Pirfenidone Mechanism
-        </button>
-
-        <button
-          onClick={() => handleSelectDrug('Pamrevlumab')}
-          className={`px-3 py-1 rounded-full font-medium transition whitespace-nowrap ${
-            selectedDrug === 'Pamrevlumab'
-              ? 'bg-blue-600 text-white shadow-2xs'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          🔬 Pamrevlumab Phase 3 Result
-        </button>
-
-        <button
-          onClick={() => handleSelectDrug('all')}
-          className={`px-3 py-1 rounded-full font-medium transition whitespace-nowrap ${
-            selectedDrug === 'all'
-              ? 'bg-slate-800 text-white shadow-2xs'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          🌐 Full IPF Graph
-        </button>
-      </div>
-
-      {/* 3. Main Workspace Area */}
-      <main className="flex-1 relative overflow-hidden p-4 flex flex-col gap-2.5">
-        {/* Agent Thought Stream */}
-        <AgentThinking activeDrug={selectedDrug} />
-
-        {activeTab === 'graph' ? (
-          <div className="relative w-full flex-1 min-h-0">
-            {loading && (
-              <div className="absolute inset-0 bg-white/60 backdrop-blur-2xs flex items-center justify-center z-10 text-xs font-medium text-slate-500">
-                Traversing Neo4j Graph...
-              </div>
-            )}
-            <GraphCanvas
-              nodes={nodes}
-              links={links}
-              selectedNode={selectedNode}
-              onSelectNode={(node) => setSelectedNode(node)}
-            />
-            {/* Slide-out Evidence Inspector */}
-            <EntityInspector
-              node={selectedNode}
-              onClose={() => setSelectedNode(null)}
-            />
+      {/* 2. Main Investigation Container */}
+      <main className="max-w-5xl mx-auto px-4 py-8 flex-1 w-full space-y-6">
+        {/* Disease Investigation Bar */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">
+              Investigate Disease Relationships & Evidence
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Ask MedTrail to traverse the knowledge graph, uncover indirect multi-hop pathways, and evaluate candidate medicines with transparent evidence tiers.
+            </p>
           </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto max-w-6xl mx-auto w-full">
-            <CandidateTable
-              candidates={candidates}
-              onSelectCandidate={(drug) => handleSelectDrug(drug)}
-            />
+
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search
+                size={16}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                value={diseaseInput}
+                onChange={(e) => setDiseaseInput(e.target.value)}
+                placeholder="Enter disease to investigate..."
+                className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+              />
+            </div>
+            <button
+              onClick={() => handleInvestigate('Nintedanib')}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5"
+            >
+              <span>Investigate</span>
+              <ArrowRight size={14} />
+            </button>
           </div>
-        )}
+
+          {/* Quick Investigation Presets */}
+          <div className="flex items-center gap-2 flex-wrap pt-1 text-xs">
+            <span className="text-slate-400 font-medium">Sample Investigations:</span>
+            <button
+              onClick={() => handleInvestigate('Nintedanib', 'Idiopathic Pulmonary Fibrosis')}
+              className={`px-3 py-1 rounded-full font-medium transition ${
+                activeDrug === 'Nintedanib'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              🌟 How Nintedanib was Discovered (Known-Path Validation)
+            </button>
+            <button
+              onClick={() => handleInvestigate('Imatinib', 'Idiopathic Pulmonary Fibrosis')}
+              className={`px-3 py-1 rounded-full font-medium transition ${
+                activeDrug === 'Imatinib'
+                  ? 'bg-amber-600 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              ⚠️ Why Imatinib Failed (Preserved Conflicting Evidence)
+            </button>
+            <button
+              onClick={() => handleInvestigate('Pirfenidone', 'Idiopathic Pulmonary Fibrosis')}
+              className={`px-3 py-1 rounded-full font-medium transition ${
+                activeDrug === 'Pirfenidone'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              🧪 Pirfenidone Mechanism (TGF-β Pathway)
+            </button>
+          </div>
+        </div>
+
+        {/* 3. Live AI Agent Thought Stream */}
+        <AgentThinking activeDrug={activeDrug} />
+
+        {/* 4. Multi-Hop Evidence Trail */}
+        <EvidenceChain drugName={activeDrug} />
+
+        {/* 5. Candidate Investigation Results */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-slate-900">
+              Candidate Medicines & Evidence Hierarchy for {diseaseInput}
+            </h2>
+            <span className="text-xs text-slate-500">
+              Ordered by highest evidence tier first
+            </span>
+          </div>
+
+          {/* Detailed view of currently focused candidate */}
+          {selectedCandidate && (
+            <CandidateCard
+              candidate={selectedCandidate}
+              isSelected={true}
+              onSelect={() => {}}
+            />
+          )}
+
+          {/* Quick list of other candidates to inspect */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+            {candidates
+              .filter((c) => c.drug_name.toLowerCase() !== activeDrug.toLowerCase())
+              .map((cand) => (
+                <div
+                  key={cand.drug_id}
+                  onClick={() => handleInvestigate(cand.drug_name)}
+                  className="bg-white rounded-xl border border-slate-200 p-4 hover:border-slate-300 hover:shadow-xs transition cursor-pointer flex flex-col justify-between space-y-2 text-xs"
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900 text-sm">{cand.drug_name}</span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                        Tier {cand.best_tier}
+                      </span>
+                    </div>
+                    <p className="text-slate-500 text-[11px] line-clamp-2 mt-1">
+                      {cand.mechanism}
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-blue-600 font-medium text-[11px]">
+                    <span>Inspect Evidence Trail</span>
+                    <ArrowRight size={12} />
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+
+        {/* 6. Scientific Disclaimer */}
+        <div className="bg-slate-100/80 border border-slate-200 rounded-xl p-4 text-xs text-slate-600 space-y-1">
+          <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+            <ShieldCheck size={14} className="text-blue-600" />
+            MedTrail Scientific Limitations & Grounding Guarantee
+          </div>
+          <p className="leading-relaxed">
+            MedTrail is an exploratory hypothesis-generation tool. Indirect graph paths indicate biological connections worth investigating, but do not establish clinical efficacy or safety. All conclusions preserve negative findings and provide direct citations to ClinicalTrials.gov and PubMed records.
+          </p>
+        </div>
       </main>
 
-      {/* 4. Benchmark Modal */}
+      {/* 7. Benchmark Modal */}
       {showBenchmark && (
         <BenchmarkModal
           data={benchmarkData}
