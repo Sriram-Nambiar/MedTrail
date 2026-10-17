@@ -118,6 +118,19 @@ Key Endpoints:
 - `GET /api/graph/candidates`: Candidates ranked by evidence tiers.
 - `GET /api/graph/conflicts`: Conflicting evidence detection.
 - `GET /api/graph/search?q=fibrosis`: Full-text entity search.
+- `GET /api/agent/investigate?question=Imatinib%20for%20IPF&drug_name=Imatinib`: Graph-grounded synthesis with its multi-hop retrieval trace, trial IDs, PubMed IDs, and safety caveat.
+
+### 5. Hackathon Demo Flow
+
+1. Open the app and select **How Nintedanib was Discovered**. Show the disease → gene → protein → pathway → drug → trial trail and the Tier 1 trial evidence.
+2. Select **Why Imatinib Failed**. The retrieval agent returns a warning and keeps both the promising preclinical evidence and the negative human trial visible.
+3. Enter `Nintedanib for IPF` in the investigation box. The live response reports its multi-hop path count and linked NCT/PMID provenance rather than making an ungrounded claim.
+4. Open **Graph vs Keyword Search** to explain why relationship-aware retrieval finds links that a simple name match misses.
+5. Select **Summarize Nintedanib Papers**. MedTrail writes the question, answer, cited paper entities, and its visible retrieval trace into the `demo-researcher` Neo4j conversation. Switch to Imatinib, summarize it, then point out that one session now retains both evidence trails.
+
+### Research-memory architecture
+
+MedTrail implements the Neo4j Agent Memory three-layer pattern directly in its research graph: `Conversation` → `Message` for short-term history, `MENTIONS`/`CITES` edges to long-term biomedical entities, and `ReasoningTrace` → `ReasoningStep` → `ToolCall` for application-recorded retrieval provenance. The MVP intentionally stores *visible retrieval steps*, never private model chain-of-thought.
 
 ---
 
