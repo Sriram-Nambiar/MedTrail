@@ -367,3 +367,29 @@ def get_keyword_vs_graph_comparison() -> Dict[str, Any]:
         }
     }
 
+def get_ingested_papers(drug_name: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Retrieve verified PubMed literature records from Neo4j."""
+    with neo4j_conn.get_session() as session:
+        cypher = """
+            MATCH (rp:ResearchPaper)
+            OPTIONAL MATCH (dr:Drug)-[:REFERENCED_IN]->(rp)
+            OPTIONAL MATCH (rp)-[:SUPPORTS_OR_REPORTS]->(ev:Evidence)
+            OPTIONAL MATCH (rp)-[:STUDIES_TARGET]->(g:Gene)
+            WHERE $drug_name IS NULL OR toLower(dr.name) = toLower($drug_name)
+            RETURN DISTINCT 
+                rp.id AS id,
+                rp.pmid AS pmid,
+                rp.doi AS doi,
+                rp.title AS title,
+                rp.journal AS journal,
+                rp.pub_date AS pub_date,
+                rp.abstract AS abstract,
+                coalesce(dr.name, 'General IPF') AS drug_name,
+                g.symbol AS target_gene,
+                ev.tier AS evidence_tier,
+                ev.direction AS evidence_direction
+            ORDER BY rp.pub_date DESC
+        """
+        results = session.run(cypher, drug_name=drug_name).data()
+        return results
+

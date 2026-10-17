@@ -97,3 +97,18 @@ export interface KeywordBenchmark {
     };
   };
 }
+
+export interface ResearchPaperItem {
+  id: string;
+  pmid: string;
+  doi: string;
+  title: string;
+  journal: string;
+  pub_date: string;
+  abstract: string;
+  drug_name: string;
+  target_gene?: string;
+  evidence_tier?: number;
+  evidence_direction?: string;
+}
+

@@ -12,6 +12,7 @@ from app.db.queries import (
     search_biomedical_entities,
     get_subgraph,
     get_keyword_vs_graph_comparison,
+    get_ingested_papers,
 )
 
 app = FastAPI(
@@ -99,6 +100,19 @@ def graph_subgraph(
 def graph_comparison():
     try:
         return get_keyword_vs_graph_comparison()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/graph/papers")
+def graph_papers(
+    drug_name: Optional[str] = Query(default=None, description="Filter papers by drug name")
+):
+    try:
+        papers = get_ingested_papers(drug_name=drug_name)
+        return {
+            "papers_count": len(papers),
+            "papers": papers
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
