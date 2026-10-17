@@ -141,3 +141,13 @@ def search_entities(
 @app.on_event("shutdown")
 def shutdown_event():
     neo4j_conn.close_driver()
+
+# Mount frontend production build if available
+import os
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
+frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+
