@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { AgentInvestigation, PaperSummary, ResearchMemory } from './types/graph';
 import {
   ArrowUp,
@@ -296,7 +298,11 @@ export function App() {
                       <span className="text-[10px] opacity-70">{msg.timestamp}</span>
                     </div>
 
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    <div className="prose prose-slate max-w-none text-[13.5px] leading-relaxed [&>h2]:text-base [&>h2]:font-bold [&>h2]:text-slate-900 [&>h2]:mt-2 [&>h2]:mb-1 [&>h3]:text-sm [&>h3]:font-bold [&>h3]:text-slate-900 [&>h3]:mt-2 [&>h3]:mb-1 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:my-2 [&>ul]:space-y-1 [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:my-2 [&>ol]:space-y-1 [&>p]:my-1.5 [&>table]:border-collapse [&>table]:border [&>table]:border-slate-300 [&>table]:w-full [&>table]:my-3 [&>table_th]:border [&>table_th]:border-slate-300 [&>table_th]:bg-slate-100 [&>table_th]:p-2 [&>table_th]:text-left [&>table_th]:font-semibold [&>table_td]:border [&>table_td]:border-slate-300 [&>table_td]:p-2">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
 
                     {/* Metadata / Provenance Badges for Assistant */}
                     {msg.retrieval && (

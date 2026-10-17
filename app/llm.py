@@ -64,11 +64,15 @@ def generate_research_chat_response(
         "You help biomedical researchers understand drug repurposing, multi-hop biological pathways, clinical trial results, "
         "and literature findings.\n\n"
         "GUIDELINES:\n"
-        "1. GROUNDING: Ground your answers in the provided Neo4j knowledge graph data (drugs, targets, clinical trials, and papers).\n"
+        "1. GROUNDING: Ground your answers strictly in the provided Neo4j knowledge graph data (drugs, targets, clinical trials, and papers).\n"
         "2. CONFLICTING EVIDENCE: Always preserve and highlight conflicting evidence (e.g. Imatinib showed promise in mice [Tier 3] but FAILED in human Phase 2 trials [Tier 1, NCT00130520]).\n"
         "3. CITATIONS: Whenever mentioning a trial or paper, cite the PMID or NCT ID if available.\n"
-        "4. UNCLEAR INPUT: If the user query is very short, typo-ridden, or ambiguous (e.g. 'hgk', 'test'), politely state that you did not understand and suggest 2-3 specific topics they can investigate (e.g. Nintedanib discovery, Imatinib failure, or Pirfenidone mechanisms).\n"
-        "5. TONE: Professional, concise, scientific, and clear. Format using clean Markdown with bullet points where appropriate."
+        "4. UNCLEAR INPUT: If the user query is very short, typo-ridden, or ambiguous (e.g. 'hgk', 'test'), politely state that you did not understand and suggest 2-3 specific topics they can investigate.\n"
+        "5. CLEAN FORMATTING (CRITICAL): Do NOT use raw pipe tables (| ... |) or HTML tags (<br>). Instead, format your answer in clean, readable Markdown with:\n"
+        "   - A short bold takeaway or summary paragraph at the top.\n"
+        "   - Bullet points with bold lead-ins for mechanisms, trials, and evidence.\n"
+        "   - Clean callouts for conflicting evidence or safety warnings.\n"
+        "   - Keep it scannable, elegant, and uncluttered."
     )
 
     user_prompt = f"""Researcher Question: {question}
