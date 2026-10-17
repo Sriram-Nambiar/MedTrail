@@ -154,3 +154,216 @@ def search_biomedical_entities(search_term: str) -> List[Dict[str, Any]]:
         """
         results = session.run(query, term=search_term).data()
         return results
+
+NODE_COLOR_MAP = {
+    "Disease": "#EF4444",       # Red
+    "Pathway": "#8B5CF6",       # Purple
+    "Gene": "#38BDF8",          # Sky Blue
+    "Protein": "#06B6D4",       # Cyan
+    "Drug": "#10B981",          # Emerald Green
+    "ClinicalStudy": "#F59E0B", # Amber
+    "ResearchPaper": "#6366F1", # Indigo
+    "Evidence": "#14B8A6",      # Teal
+    "SideEffect": "#EC4899",    # Pink
+    "Hypothesis": "#F97316",    # Orange
+}
+
+NODE_SIZE_MAP = {
+    "Disease": 32,
+    "Drug": 26,
+    "Pathway": 22,
+    "Protein": 18,
+    "Gene": 16,
+    "ClinicalStudy": 18,
+    "Evidence": 20,
+    "ResearchPaper": 16,
+    "SideEffect": 16,
+    "Hypothesis": 22,
+}
+
+def get_subgraph(drug_name: Optional[str] = None, disease_id: str = "DIS:IPF") -> Dict[str, Any]:
+    """
+    Retrieve subgraph nodes and links formatted for interactive frontend visualization.
+    """
+    with neo4j_conn.get_session() as session:
+        if drug_name and drug_name.lower() != "all":
+            # Targeted subgraph for specific drug exploration path
+            query = """
+                MATCH (d:Disease {id: $disease_id})
+                MATCH (dr:Drug)
+                WHERE toLower(dr.name) = toLower($drug_name)
+                
+                // Targets and pathways
+                OPTIONAL MATCH (dr)-[r_tgt:TARGETS]->(p:Protein)<-[r_enc:ENCODES]-(g:Gene)<-[r_assoc:ASSOCIATED_WITH]-(d)
+                OPTIONAL MATCH (p)-[r_pw:PARTICIPATES_IN]->(pw:Pathway)
+                
+                // Studies and Evidence
+                OPTIONAL MATCH (dr)-[r_inv:INVESTIGATED_IN]->(cs:ClinicalStudy)-[r_rep:REPORTS]->(ev:Evidence)-[r_abt:ABOUT]->(d)
+                OPTIONAL MATCH (dr)-[r_has_ev:HAS_EVIDENCE]->(ev2:Evidence)-[r_abt2:ABOUT]->(d)
+                OPTIONAL MATCH (rp:ResearchPaper)-[r_supp:SUPPORTS_OR_REPORTS]->(ev)
+                OPTIONAL MATCH (rp2:ResearchPaper)-[r_supp2:SUPPORTS_OR_REPORTS]->(ev2)
+                
+                // Side effects
+                OPTIONAL MATCH (dr)-[r_se:ASSOCIATED_WITH_ADVERSE_EVENT]->(se:SideEffect)
+                
+                // Hypotheses
+                OPTIONAL MATCH (ev)-[r_hyp:SUPPORTS]->(hyp:Hypothesis)
+                OPTIONAL MATCH (ev2)-[r_hyp2:SUPPORTS]->(hyp2:Hypothesis)
+                
+                RETURN 
+                    collect(DISTINCT d) AS diseases,
+                    collect(DISTINCT dr) AS drugs,
+                    collect(DISTINCT p) AS proteins,
+                    collect(DISTINCT g) AS genes,
+                    collect(DISTINCT pw) AS pathways,
+                    collect(DISTINCT cs) AS studies,
+                    collect(DISTINCT rp) + collect(DISTINCT rp2) AS papers,
+                    collect(DISTINCT ev) + collect(DISTINCT ev2) AS evidences,
+                    collect(DISTINCT se) AS side_effects,
+                    collect(DISTINCT hyp) + collect(DISTINCT hyp2) AS hypotheses
+            """
+        else:
+            # Full IPF Knowledge Graph
+            query = """
+                MATCH (d:Disease {id: $disease_id})
+                OPTIONAL MATCH (d)-[:ASSOCIATED_WITH]->(g:Gene)-[:ENCODES]->(p:Protein)-[:PARTICIPATES_IN]->(pw:Pathway)
+                OPTIONAL MATCH (dr:Drug)-[:TARGETS]->(p)
+                OPTIONAL MATCH (dr)-[:INVESTIGATED_IN]->(cs:ClinicalStudy)-[:REPORTS]->(ev:Evidence)-[:ABOUT]->(d)
+                OPTIONAL MATCH (dr)-[:HAS_EVIDENCE]->(ev2:Evidence)-[:ABOUT]->(d)
+                OPTIONAL MATCH (rp:ResearchPaper)-[:SUPPORTS_OR_REPORTS]->(ev)
+                OPTIONAL MATCH (rp2:ResearchPaper)-[:SUPPORTS_OR_REPORTS]->(ev2)
+                OPTIONAL MATCH (dr)-[:ASSOCIATED_WITH_ADVERSE_EVENT]->(se:SideEffect)
+                OPTIONAL MATCH (ev)-[:SUPPORTS]->(hyp:Hypothesis)
+                OPTIONAL MATCH (ev2)-[:SUPPORTS]->(hyp2:Hypothesis)
+                RETURN 
+                    collect(DISTINCT d) AS diseases,
+                    collect(DISTINCT dr) AS drugs,
+                    collect(DISTINCT p) AS proteins,
+                    collect(DISTINCT g) AS genes,
+                    collect(DISTINCT pw) AS pathways,
+                    collect(DISTINCT cs) AS studies,
+                    collect(DISTINCT rp) + collect(DISTINCT rp2) AS papers,
+                    collect(DISTINCT ev) + collect(DISTINCT ev2) AS evidences,
+                    collect(DISTINCT se) AS side_effects,
+                    collect(DISTINCT hyp) + collect(DISTINCT hyp2) AS hypotheses
+            """
+
+        data = session.run(query, disease_id=disease_id, drug_name=drug_name).single()
+        
+        nodes_dict = {}
+        def add_node(item, label_type):
+            if not item or not item.get("id"):
+                return
+            nid = item["id"]
+            if nid not in nodes_dict:
+                name = item.get("name") or item.get("symbol") or item.get("title") or nid
+                nodes_dict[nid] = {
+                    "id": nid,
+                    "label": name,
+                    "type": label_type,
+                    "color": NODE_COLOR_MAP.get(label_type, "#94A3B8"),
+                    "size": NODE_SIZE_MAP.get(label_type, 18),
+                    "properties": dict(item)
+                }
+
+        for d in data["diseases"]: add_node(d, "Disease")
+        for dr in data["drugs"]: add_node(dr, "Drug")
+        for p in data["proteins"]: add_node(p, "Protein")
+        for g in data["genes"]: add_node(g, "Gene")
+        for pw in data["pathways"]: add_node(pw, "Pathway")
+        for cs in data["studies"]: add_node(cs, "ClinicalStudy")
+        for rp in data["papers"]: add_node(rp, "ResearchPaper")
+        for ev in data["evidences"]: add_node(ev, "Evidence")
+        for se in data["side_effects"]: add_node(se, "SideEffect")
+        for hyp in data["hypotheses"]: add_node(hyp, "Hypothesis")
+
+        # Now query all active relationships between these collected nodes
+        node_ids = list(nodes_dict.keys())
+        rel_query = """
+            MATCH (a)-[r]->(b)
+            WHERE a.id IN $node_ids AND b.id IN $node_ids
+            RETURN DISTINCT 
+                elementId(r) AS rel_id,
+                a.id AS source,
+                b.id AS target,
+                type(r) AS type,
+                properties(r) AS properties
+        """
+        rels = session.run(rel_query, node_ids=node_ids).data()
+        
+        links = []
+        for r in rels:
+            links.append({
+                "id": str(r["rel_id"]),
+                "source": r["source"],
+                "target": r["target"],
+                "type": r["type"],
+                "label": r["type"].replace("_", " ").lower(),
+                "properties": r["properties"]
+            })
+
+        return {
+            "nodes": list(nodes_dict.values()),
+            "links": links,
+            "metrics": {
+                "node_count": len(nodes_dict),
+                "link_count": len(links),
+                "focused_drug": drug_name if drug_name and drug_name.lower() != "all" else "All Candidates"
+            }
+        }
+
+def get_keyword_vs_graph_comparison() -> Dict[str, Any]:
+    """
+    Produces the documented comparison between plain keyword lookup and Neo4j multi-hop retrieval.
+    """
+    return {
+        "disease": "Idiopathic Pulmonary Fibrosis (IPF)",
+        "scenario_1": {
+            "title": "Nintedanib Repurposing Discovery (Oncology -> IPF)",
+            "keyword_search": {
+                "query": 'PubMed: "Idiopathic Pulmonary Fibrosis" AND "BIBF 1120" (Pre-2008)',
+                "direct_results": 0,
+                "limitation": "BIBF 1120 was researched as an oncology angiokinase inhibitor. A naive literature keyword search showed no direct co-occurrence with pulmonary fibrosis before clinical development began.",
+                "surfaced_path": None
+            },
+            "graph_retrieval": {
+                "query": 'MATCH (d:Disease {name: "IPF"})-[:ASSOCIATED_WITH]->(g)-[:ENCODES]->(p)-[:PARTICIPATES_IN]->(pw)<-[:PARTICIPATES_IN]-(target)<-[:TARGETS]-(dr:Drug)',
+                "multi_hop_found": True,
+                "hops": 4,
+                "chain": [
+                    "IPF connects to Receptor Tyrosine Kinase & FGFR/PDGF pathways",
+                    "Pathways contain FGFR1, FGFR2, FGFR3, PDGFRA, PDGFRB, and KDR targets",
+                    "Nintedanib potently inhibits these exact RTK targets at nanomolar IC50",
+                    "Preclinical & Phase 3 INPULSIS trials confirm ~50% slowing of FVC decline"
+                ],
+                "outcome": "Multi-hop discovery successfully surfaced the indirect biological link through pathway and target intersections that simple keyword matching missed."
+            }
+        },
+        "scenario_2": {
+            "title": "Imatinib: Distinguishing Mechanistic Plausibility from Clinical Trial Reality",
+            "keyword_search": {
+                "query": 'PubMed: "Imatinib" AND "Pulmonary Fibrosis" AND "Antifibrotic"',
+                "direct_results": 45,
+                "limitation": "Keyword search returns multiple papers calling Imatinib a 'novel antifibrotic agent' based on early mouse models. A chatbot summarizer without evidence hierarchy risks falsely presenting Imatinib as effective.",
+                "surfaced_path": "Superficial positive association"
+            },
+            "graph_retrieval": {
+                "query": 'MATCH (dr:Drug {name: "Imatinib"})-[:HAS_EVIDENCE]->(ev:Evidence) RETURN ev.tier, ev.direction',
+                "multi_hop_found": True,
+                "evidence_stratification": {
+                    "preclinical": {
+                        "tier": 3,
+                        "direction": "supports",
+                        "summary": "Murine bleomycin models showed PDGF phosphorylation blockade (Aono et al. 2005)."
+                    },
+                    "clinical_trial": {
+                        "tier": 1,
+                        "direction": "no_effect",
+                        "summary": "Randomized double-blind Phase 2 trial of 119 patients proved NO benefit on survival or FVC rate of decline (Daniels et al. 2010, NCT00130520)."
+                    }
+                },
+                "outcome": "MedTrail's evidence-tier hierarchy prevents clinical misinformation by displaying the Phase 2 failure (Tier 1) as the governing finding over mouse data (Tier 3)."
+            }
+        }
+    }
+

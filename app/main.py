@@ -10,6 +10,8 @@ from app.db.queries import (
     get_candidate_drugs_with_evidence,
     get_conflicting_evidence_report,
     search_biomedical_entities,
+    get_subgraph,
+    get_keyword_vs_graph_comparison,
 )
 
 app = FastAPI(
@@ -58,6 +60,23 @@ def health_check():
 def graph_overview():
     try:
         return get_graph_overview()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/graph/subgraph")
+def graph_subgraph(
+    drug_name: Optional[str] = Query(default=None, description="Drug name for targeted path, or 'all'"),
+    disease_id: str = Query(default="DIS:IPF", description="Disease ID")
+):
+    try:
+        return get_subgraph(drug_name=drug_name, disease_id=disease_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/graph/comparison")
+def graph_comparison():
+    try:
+        return get_keyword_vs_graph_comparison()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
